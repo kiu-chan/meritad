@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
   runApp(const MyApp());
 }
 
@@ -17,6 +24,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        useMaterial3: true,
       ),
       home: const WebViewApp(),
     );
@@ -31,84 +39,78 @@ class WebViewApp extends StatefulWidget {
 }
 
 class _WebViewAppState extends State<WebViewApp> {
-  late final WebViewController controller;
+  final GlobalKey webViewKey = GlobalKey();
+  InAppWebViewController? webViewController;
   bool isLoading = true;
 
   @override
-  void initState() {
-    super.initState();
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..enableZoom(true)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            setState(() {
-              isLoading = true;
-            });
-          },
-          onPageFinished: (String url) {
-            setState(() {
-              isLoading = false;
-            });
-            // Thêm listener cho refresh
-            controller.runJavaScript('''
-              document.addEventListener('touchstart', function(e) {
-                window.flutter_inappwebview.callHandler('onTouchStart', window.pageYOffset);
-              });
-              
-              document.addEventListener('touchend', function(e) {
-                window.flutter_inappwebview.callHandler('onTouchEnd', window.pageYOffset);
-                if (window.pageYOffset < -50) {
-                  location.reload();
-                }
-              });
-            ''');
-          },
-          onWebResourceError: (WebResourceError error) {
-            debugPrint('WebView error: ${error.description}');
-          },
-          // Xử lý điều hướng
-          onNavigationRequest: (NavigationRequest request) {
-            debugPrint('Navigation to: ${request.url}');
-            // Cho phép tất cả các điều hướng
-            return NavigationDecision.navigate;
-          },
-        ),
-      )
-      ..addJavaScriptChannel(
-        'flutter_inappwebview',
-        onMessageReceived: (JavaScriptMessage message) {
-          if (message.message == 'refresh') {
-            controller.reload();
-          }
-        },
-      )
-      ..loadRequest(
-        Uri.parse('https://meritad.ng/'),
-      );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        left: false,
-        right: false,
-        child: Stack(
-          children: [
-            WebViewWidget(
-              controller: controller,
-            ),
-            if (isLoading)
-              const Center(
-                child: CircularProgressIndicator(),
+    return WillPopScope(
+      onWillPop: () async {
+        if (await webViewController?.canGoBack() ?? false) {
+          webViewController?.goBack();
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              InAppWebView(
+                key: webViewKey,
+                initialUrlRequest: URLRequest(
+                  url: WebUri("https://meritad.ng/"),
+                ),
+                initialOptions: InAppWebViewGroupOptions(
+                  crossPlatform: InAppWebViewOptions(
+                    useShouldOverrideUrlLoading: true,
+                    mediaPlaybackRequiresUserGesture: false,
+                    javaScriptEnabled: true,
+                  ),
+                  ios: IOSInAppWebViewOptions(
+                    allowsInlineMediaPlayback: true,
+                  ),
+                  android: AndroidInAppWebViewOptions(
+                    useHybridComposition: true,
+                  ),
+                ),
+                onWebViewCreated: (controller) {
+                  webViewController = controller;
+                },
+                onLoadStart: (controller, url) {
+                  setState(() => isLoading = true);
+                },
+                onLoadStop: (controller, url) {
+                  setState(() => isLoading = false);
+                },
+                shouldOverrideUrlLoading: (controller, navigationAction) async {
+                  var uri = navigationAction.request.url!;
+                  if (uri.scheme == 'tel' ||
+                      uri.scheme == 'mailto' ||
+                      uri.scheme == 'sms' ||
+                      uri.toString().startsWith('https://wa.me/') ||
+                      uri.scheme == 'whatsapp') {
+                    try {
+                      await launchUrl(Uri.parse(uri.toString()));
+                      return NavigationActionPolicy.CANCEL;
+                    } catch (e) {
+                      debugPrint('Error launching URL: $e');
+                    }
+                  }
+                  return NavigationActionPolicy.ALLOW;
+                },
+                onReceivedError: (controller, request, error) {
+                  debugPrint('WebView error: ${error.description}');
+                },
               ),
-          ],
+              if (isLoading)
+                const Center(
+                  child: CircularProgressIndicator(),
+                ),
+            ],
+          ),
         ),
       ),
     );
