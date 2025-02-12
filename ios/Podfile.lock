@@ -9,7 +9,23 @@ PODS:
   - flutter_inappwebview_ios/Core (0.0.1):
     - Flutter
     - OrderedSet (~> 6.0.3)
+  - onesignal_flutter (3.5.4):
+    - Flutter
+    - OneSignalXCFramework (= 3.12.10)
+  - OneSignalXCFramework (3.12.10):
+    - OneSignalXCFramework/OneSignalCore (= 3.12.10)
+    - OneSignalXCFramework/OneSignalExtension (= 3.12.10)
+    - OneSignalXCFramework/OneSignalOutcomes (= 3.12.10)
+  - OneSignalXCFramework/OneSignalCore (3.12.10)
+  - OneSignalXCFramework/OneSignalExtension (3.12.10):
+    - OneSignalXCFramework/OneSignalCore
+    - OneSignalXCFramework/OneSignalOutcomes
+  - OneSignalXCFramework/OneSignalOutcomes (3.12.10):
+    - OneSignalXCFramework/OneSignalCore
   - OrderedSet (6.0.3)
+  - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - url_launcher_ios (0.0.1):
     - Flutter
 
@@ -17,10 +33,13 @@ DEPENDENCIES:
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - Flutter (from `Flutter`)
   - flutter_inappwebview_ios (from `.symlinks/plugins/flutter_inappwebview_ios/ios`)
+  - onesignal_flutter (from `.symlinks/plugins/onesignal_flutter/ios`)
+  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
 SPEC REPOS:
   trunk:
+    - OneSignalXCFramework
     - OrderedSet
 
 EXTERNAL SOURCES:
@@ -30,6 +49,10 @@ EXTERNAL SOURCES:
     :path: Flutter
   flutter_inappwebview_ios:
     :path: ".symlinks/plugins/flutter_inappwebview_ios/ios"
+  onesignal_flutter:
+    :path: ".symlinks/plugins/onesignal_flutter/ios"
+  shared_preferences_foundation:
+    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   url_launcher_ios:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
@@ -37,7 +60,10 @@ SPEC CHECKSUMS:
   connectivity_plus: 2a701ffec2c0ae28a48cf7540e279787e77c447d
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_inappwebview_ios: 6f63631e2c62a7c350263b13fa5427aedefe81d4
+  onesignal_flutter: 0f6d0e3452b86564b958a28a6b05d97b65602fee
+  OneSignalXCFramework: e458f7a374192598a1d66418e1b61481c3cdf0e9
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
+  shared_preferences_foundation: fcdcbc04712aee1108ac7fda236f363274528f78
   url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
 PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796

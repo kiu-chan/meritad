@@ -2,15 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+
+  try {
+    await OneSignal.shared.setAppId("ea3bb8a0-7af7-410b-bc3b-679f1fc38184");
+    await OneSignal.shared.promptUserForPushNotificationPermission();
+  } catch (e) {
+    debugPrint("OneSignal Error: $e");
+  }
+  
   runApp(const MyApp());
 }
 
@@ -26,13 +37,159 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const WebViewApp(),
+      home: const SplashScreen(),
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({Key? key}) : super(key: key);
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  WebUri initialUrl = WebUri("https://meritad.ng/");
+  bool isWebViewLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTime();
+  }
+
+  void _checkFirstTime() async {
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final bool onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => onboardingComplete 
+          ? const WebViewApp() 
+          : const OnboardingScreen(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'lib/assets/logo.png',
+                  width: 200,
+                  height: 200,
+                ),
+                const SizedBox(height: 30),
+                const CircularProgressIndicator(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class OnboardingScreen extends StatelessWidget {
+  const OnboardingScreen({Key? key}) : super(key: key);
+
+  Future<void> _markOnboardingComplete(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_complete', true);
+    if (context.mounted) {
+      // Pop tất cả các màn hình trước và thay thế bằng WebViewApp
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const WebViewApp()),
+        (Route<dynamic> route) => false,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'lib/assets/logo.png',
+                      width: 150,
+                      height: 150,
+                    ),
+                    const SizedBox(height: 40),
+                    const Text(
+                      'Chào mừng đến với MeritAd',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'MeritAd là một nền tảng cung cấp các giải pháp sáng tạo trong quản lý nhân tài, nguồn nhân lực và ghi nhận nhân viên.\n\nChúng tôi giúp doanh nghiệp tạo môi trường làm việc tích cực thông qua đánh giá dựa trên thành tích và hỗ trợ phát triển chuyên môn.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _markOnboardingComplete(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Bắt đầu sử dụng',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class WebViewApp extends StatefulWidget {
-  const WebViewApp({super.key});
+  const WebViewApp({Key? key}) : super(key: key);
 
   @override
   State<WebViewApp> createState() => _WebViewAppState();
@@ -42,6 +199,27 @@ class _WebViewAppState extends State<WebViewApp> {
   final GlobalKey webViewKey = GlobalKey();
   InAppWebViewController? webViewController;
   bool isLoading = true;
+  String errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    initPlatformState();
+  }
+
+  Future<void> initPlatformState() async {
+    OneSignal.shared.setNotificationWillShowInForegroundHandler(
+      (OSNotificationReceivedEvent event) {
+        event.complete(event.notification);
+      }
+    );
+
+    OneSignal.shared.setNotificationOpenedHandler(
+      (OSNotificationOpenedResult result) {
+        debugPrint('Notification opened: ${result.notification.title}');
+      }
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +246,7 @@ class _WebViewAppState extends State<WebViewApp> {
                     useShouldOverrideUrlLoading: true,
                     mediaPlaybackRequiresUserGesture: false,
                     javaScriptEnabled: true,
+                    cacheEnabled: true,
                   ),
                   ios: IOSInAppWebViewOptions(
                     allowsInlineMediaPlayback: true,
@@ -80,10 +259,19 @@ class _WebViewAppState extends State<WebViewApp> {
                   webViewController = controller;
                 },
                 onLoadStart: (controller, url) {
-                  setState(() => isLoading = true);
+                  setState(() {
+                    isLoading = true;
+                    errorMessage = '';
+                  });
                 },
                 onLoadStop: (controller, url) {
                   setState(() => isLoading = false);
+                },
+                onLoadError: (controller, url, code, message) {
+                  setState(() {
+                    isLoading = false;
+                    errorMessage = message;
+                  });
                 },
                 shouldOverrideUrlLoading: (controller, navigationAction) async {
                   var uri = navigationAction.request.url!;
@@ -101,13 +289,14 @@ class _WebViewAppState extends State<WebViewApp> {
                   }
                   return NavigationActionPolicy.ALLOW;
                 },
-                onReceivedError: (controller, request, error) {
-                  debugPrint('WebView error: ${error.description}');
-                },
               ),
               if (isLoading)
                 const Center(
                   child: CircularProgressIndicator(),
+                ),
+              if (errorMessage.isNotEmpty)
+                Center(
+                  child: Text('Error: $errorMessage'),
                 ),
             ],
           ),
